@@ -1,99 +1,115 @@
 #include <Arduino.h>
 
-#define GREEN_LED 25 //define green light and pin they use
-#define YELLOW_LED 26 //define yellow light and pin they use 
-#define RED_LED 27 //define red light and pin they use
-#define BUZZER 33 //define buzzer and pin they use
-#define TOUCH_BUTTON 2 //define button and pin they use
+// led definitions
+const int redPin = 27;
+const int yellowPin = 26;
+const int greenPin = 25;
+const int buttonPin = 2;
+const int buzzerPin = 33;
 
-unsigned long previousMillis = 0; //previous time in order to tell how long a light was on
-bool pedestrianRequest = false; //boolean to tell when the button is pressed (false hasn't been pressed)
+enum TrafficLightState { RED, RED_YELLOW, GREEN, YELLOW };
+TrafficLightState currentState = RED; //initialize state of trffic light is red
 
-enum TLState {GREEN, YELLOW, RED, RED_YELLOW}; //default order
-TLState state = GREEN; //default state when turned on
+// timing variables
+unsigned long transitionStartTime = 0; //stores previous state change time
+unsigned long buttonPressTime = 0; //stores when button was pressed
+bool buttonPressed = false; //boolean to track when button is pressed
+
+const unsigned long redDuration = 10000; // 10 seconds
+const unsigned long yellowDuration = 2000; // 2 seconds
+const unsigned long redYellowDuration = 2000; // 2 seconds
+const unsigned long minGreenDuration = 5000; // 5 seconds
+
+// buzzer variables
+const unsigned long greenBuzzerOn = 500; //green buzzer on for 500ms
+const unsigned long greenBuzzerOff = 1500; //green buzzer off for 1500ms
+const unsigned long redBuzzerOn = 250; //red buzzer on for 250ms
+const unsigned long redBuzzerOff = 250; //red buzzer off for 250ms
+unsigned long buzzerStartTime = 0; //stores last buzzer toggle time
+bool buzzerOn = false; //buzzer tracks when button is pressed
 
 void setup() {
-    //pin mode for led, buzzer, & button
-    pinMode(GREEN_LED, OUTPUT);
-    pinMode(YELLOW_LED, OUTPUT);
-    pinMode(RED_LED, OUTPUT);
-    pinMode(BUZZER, OUTPUT);
-    pinMode(TOUCH_BUTTON, INPUT);
+  //set up led, buzzer, and button  
+  pinMode(redPin, OUTPUT);
+  pinMode(yellowPin, OUTPUT);
+  pinMode(greenPin, OUTPUT);
+  pinMode(buttonPin, INPUT_PULLUP); 
+  pinMode(buzzerPin, OUTPUT);
+
+  //starts in red
+  digitalWrite(redPin, HIGH);
+  transitionStartTime = millis();
 }
 
 void loop() {
-    static unsigned long stateStartTime = millis(); //keep time with millis() function
-    static bool buzzerState = false; //boolean to tell when the buzzer should be on
-    unsigned long currentMillis = millis();
-    
-    //check if pedestrian button is pressed
-    if (digitalRead(TOUCH_BUTTON) == HIGH) {
-        pedestrianRequest = true;
+  // checks if button has been pressed
+  if (digitalRead(buttonPin) == LOW && !buttonPressed) { 
+    buttonPressed = true;
+    buttonPressTime = millis();
+  }
+
+  //gets current time
+  unsigned long currentTime = millis();
+
+  switch (currentState) {
+    //stay in red for 10secs, then switch to red-yellow  
+    case RED:
+      if (currentTime - transitionStartTime >= redDuration) {
+        currentState = RED_YELLOW;
+        transitionStartTime = currentTime;
+        digitalWrite(redPin, LOW);
+        digitalWrite(yellowPin, HIGH);
+      }
+      break;
+    //stay in red-yellow for 2secs, then switch to green
+    case RED_YELLOW:
+      if (currentTime - transitionStartTime >= redYellowDuration) {
+        currentState = GREEN;
+        transitionStartTime = currentTime;
+        digitalWrite(yellowPin, LOW);
+        digitalWrite(greenPin, HIGH);
+      }
+      break;
+
+    case GREEN:
+        //stay in green until the button is pressed and 5secs until transitio to yellow
+        if (buttonPressed && (currentTime - buttonPressTime >= minGreenDuration)) {
+            currentState = YELLOW;
+            transitionStartTime = currentTime;
+            digitalWrite(greenPin, LOW);
+            digitalWrite(yellowPin, HIGH);
+            buttonPressed = false; // Reset button flag
+        }
+
+      break;
+    //stay yello for 2secs, then swithc to red
+    case YELLOW:  
+      if (currentTime - transitionStartTime >= yellowDuration) {
+        currentState = RED;
+        transitionStartTime = currentTime;
+        digitalWrite(yellowPin, LOW);
+        digitalWrite(redPin, HIGH);
+      }
+      break;
+  }
+
+  //buzzer settings
+  if (currentState == GREEN) {
+    //green should be on for 250ms and off for 1500ms  
+    if (currentTime - buzzerStartTime >= (buzzerOn ? greenBuzzerOn : greenBuzzerOff)) {
+      buzzerOn = !buzzerOn;
+      digitalWrite(buzzerPin, buzzerOn);
+      buzzerStartTime = currentTime;
     }
-    
-    //order of the traffic light
-    switch (state) {
-        case GREEN:
-            //turns green and turns off the rest
-            digitalWrite(GREEN_LED, HIGH);
-            digitalWrite(YELLOW_LED, LOW);
-            digitalWrite(RED_LED, LOW);
-            
-            //buzzer should sound every 500ms
-            if ((currentMillis - previousMillis) >= 500) {
-                previousMillis = currentMillis;
-                buzzerState = !buzzerState;
-                digitalWrite(BUZZER, buzzerState);
-            }
-            
-            //change state to yellow is button was pressed and green light has been on for 5secs
-            if (pedestrianRequest && (currentMillis - stateStartTime >= 5000)) {
-                state = YELLOW;
-                stateStartTime = currentMillis;
-            }
-            break;
-        
-        case YELLOW:
-            //turn on yellow and keep others off
-            digitalWrite(GREEN_LED, LOW);
-            digitalWrite(YELLOW_LED, HIGH);
-            
-            //after 2secs,  swithc to red
-            if (currentMillis - stateStartTime >= 2000) {
-                state = RED;
-                stateStartTime = currentMillis;
-                pedestrianRequest = false;
-            }
-            break;
-        
-        case RED:
-            //turn on red and keep others off
-            digitalWrite(YELLOW_LED, LOW);
-            digitalWrite(RED_LED, HIGH);
-            
-            //buzeer should sound every 250ms
-            if ((currentMillis - previousMillis) >= 250) {
-                previousMillis = currentMillis;
-                buzzerState = !buzzerState;
-                digitalWrite(BUZZER, buzzerState);
-            }
-            
-            //stay red for 10 secs and swithc to yellow
-            if (currentMillis - stateStartTime >= 10000) {
-                state = RED_YELLOW;
-                stateStartTime = currentMillis;
-            }
-            break;
-        
-        case RED_YELLOW:
-            //turn yellow and red light
-            digitalWrite(YELLOW_LED, HIGH);
-            
-            //after 2secs switch to green
-            if (currentMillis - stateStartTime >= 2000) {
-                state = GREEN;
-                stateStartTime = currentMillis;
-            }
-            break;
+  } else if (currentState == RED) {
+    //red should be on and off for 250ms  
+    if (currentTime - buzzerStartTime >= (buzzerOn ? redBuzzerOn : redBuzzerOff)) {
+      buzzerOn = !buzzerOn;
+      digitalWrite(buzzerPin, buzzerOn);
+      buzzerStartTime = currentTime;
     }
-} 
+  } else {
+    //buzzer is off during red-yellow and yellow transition  
+    digitalWrite(buzzerPin, LOW); // Turn off buzzer during transitions
+  }
+}
