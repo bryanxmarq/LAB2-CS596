@@ -57,7 +57,7 @@ void loop() {
       if (currentTime - transitionStartTime >= redDuration) {
         currentState = RED_YELLOW;
         transitionStartTime = currentTime;
-        digitalWrite(redPin, LOW);
+        digitalWrite(redPin, HIGH);
         digitalWrite(yellowPin, HIGH);
       }
       break;
@@ -67,6 +67,7 @@ void loop() {
         currentState = GREEN;
         transitionStartTime = currentTime;
         digitalWrite(yellowPin, LOW);
+        digitalWrite(redPin, LOW);
         digitalWrite(greenPin, HIGH);
       }
       break;
