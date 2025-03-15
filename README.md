@@ -1,5 +1,5 @@
 # LAB2-CS596
-Participants: Bryan Marquez Aguilar
+Participants: Bryan Marquez Aguilar and Brian Guzman
 
 Lab 2 Video: 
 
