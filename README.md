@@ -3,7 +3,7 @@ Participants: Bryan Marquez Aguilar
 
 Lab 2 Video: 
 
-https://www.youtube.com/watch?v=5kjfUeF3CMM
+https://www.youtube.com/watch?v=qedlFf4raVA
 
 Lab 2 Image:
 
